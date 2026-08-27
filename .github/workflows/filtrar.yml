@@ -24,14 +24,14 @@ jobs:
         run: |
           pip install requests
 
-      - name: Ejecutar script de filtrado y verificación
+      - name: Ejecutar script
         run: |
           python filter.py
 
-      - name: Subir archivo filtrado
+      - name: Subir archivo
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
           git add lista_filtrada.m3u
-          git commit -m "Actualizar lista filtrada y verificada" || echo "Sin cambios"
+          git commit -m "Actualizar lista filtrada" || echo "Sin cambios"
           git push
