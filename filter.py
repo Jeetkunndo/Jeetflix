@@ -1,38 +1,20 @@
 import requests
-import re
-import unicodedata
 import sys
 
-# Tus canales (sin A24 porque da error y sin resoluciones para que coincidan mejor)
+# IMPORTANTE: estos nombres tienen que ser copiados EXACTAMENTE de iptv-org
 CANALES = [
     "24/7 Canal de Noticias",
-    "Canal 26",
-    "TN",
-    "America TV",
-    "El Nueve",
-    "El Siete",
-    "El Trece",
-    "La Nacion +",
-    "Telefe Interior"
+    "Canal 26 (1080p)",
+    "TN (1080p)",
+    "América TV (1080p)",
+    "El Nueve (1080p)",
+    "El Siete (1080p)",
+    "El Trece (1080p)",
+    "La Nación + (576p)",
+    "Telefe Interior (720p)"
 ]
 
-# Fuentes
-FUENTES = [
-    "https://iptv-org.github.io/iptv/countries/ar.m3u",
-    "https://raw.githubusercontent.com/Free-TV/IPTV/master/playlist.m3u8",
-    "https://m3u.cl/lista/AR"
-]
-
-def limpiar(texto):
-    # Quita paréntesis y su contenido
-    texto = re.sub(r'\s*\([^)]*\)\s*', ' ', texto)
-    # Quita símbolos como +, -, etc.
-    texto = re.sub(r'[^\w\s]', ' ', texto)
-    # Quita tildes
-    texto = unicodedata.normalize('NFKD', texto).encode('ASCII', 'ignore').decode('utf-8')
-    # Minúsculas y espacios extra
-    texto = ' '.join(texto.lower().split())
-    return texto
+FUENTE = "https://iptv-org.github.io/iptv/countries/ar.m3u"
 
 def descargar_lista(url):
     try:
@@ -53,8 +35,7 @@ def extraer_canales(contenido):
             if i + 1 < len(lineas) and not lineas[i+1].startswith('#'):
                 url = lineas[i+1].strip()
                 canales.append({
-                    'nombre_original': nombre,
-                    'nombre_limpio': limpiar(nombre),
+                    'nombre': nombre,
                     'extinf': lineas[i],
                     'url': url
                 })
@@ -65,46 +46,43 @@ def extraer_canales(contenido):
             i += 1
     return canales
 
-def verificar_url(url, timeout=3):
-    try:
-        response = requests.head(url, timeout=timeout, allow_redirects=True)
-        return response.status_code < 400
-    except:
-        return False
-
 def main():
-    # Limpiar nombres de tus canales
-    canales_a_buscar = {limpiar(c): c for c in CANALES}
-    canales_encontrados = {}
+    print("📡 Descargando iptv-org...")
+    contenido = descargar_lista(FUENTE)
+    if not contenido:
+        print("Error")
+        sys.exit(1)
     
-    for fuente in FUENTES:
-        contenido = descargar_lista(fuente)
-        if not contenido:
-            continue
-        canales_fuente = extraer_canales(contenido)
-        
-        for clave, nombre_original in canales_a_buscar.items():
-            if nombre_original in canales_encontrados:
-                continue
-            for canal in canales_fuente:
-                # Coincidencia exacta después de limpiar
-                if canal['nombre_limpio'] == clave:
-                    # Excluir YouTube (no funciona en Jellyfin)
-                    if 'youtube.com' in canal['url'] or 'youtu.be' in canal['url']:
-                        print(f"⚠️ {nombre_original} es YouTube, ignorado")
-                        break
-                    if verificar_url(canal['url']):
-                        canales_encontrados[nombre_original] = canal
-                        print(f"✓ {nombre_original}")
-                        break
+    canales_fuente = extraer_canales(contenido)
+    encontrados = {}
+    
+    for buscado in CANALES:
+        print(f"Buscando: {buscado}")
+        for canal in canales_fuente:
+            if canal['nombre'] == buscado:
+                if 'youtube.com' in canal['url'] or 'youtu.be' in canal['url']:
+                    print(f"  ⚠️ YouTube, ignorado")
+                    break
+                try:
+                    response = requests.head(canal['url'], timeout=3, allow_redirects=True)
+                    if response.status_code < 400:
+                        encontrados[buscado] = canal
+                        print(f"  ✅ OK")
+                    else:
+                        print(f"  ❌ No responde")
+                except:
+                    print(f"  ❌ Error")
+                break
+        else:
+            print(f"  ❌ No encontrado")
     
     with open('lista_filtrada.m3u', 'w', encoding='utf-8') as f:
         f.write('#EXTM3U\n')
-        for nombre, canal in canales_encontrados.items():
+        for nombre, canal in encontrados.items():
             f.write(canal['extinf'] + '\n')
             f.write(canal['url'] + '\n')
     
-    print(f"\n✅ Lista generada con {len(canales_encontrados)} canales")
+    print(f"\n✅ {len(encontrados)} canales encontrados")
 
 if __name__ == "__main__":
     main()
