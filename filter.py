@@ -3,7 +3,7 @@ import re
 import sys
 import os
 
-# Tus canales (palabras clave)
+# Palabras clave para buscar
 CANALES = [
     "24/7 Canal de Noticias",
     "Canal 26",
@@ -16,7 +16,13 @@ CANALES = [
     "Telefe Interior"
 ]
 
-FUENTE = "https://iptv-org.github.io/iptv/countries/ar.m3u"
+# Múltiples fuentes (más chances de encontrar)
+FUENTES = [
+    "https://iptv-org.github.io/iptv/countries/ar.m3u",
+    "https://raw.githubusercontent.com/Free-TV/IPTV/master/playlist.m3u8",
+    "https://m3u.cl/lista/AR"
+]
+
 ARCHIVO_LISTA = "lista_filtrada.m3u"
 
 def descargar_lista(url):
@@ -57,7 +63,7 @@ def verificar_url(url):
         return False
 
 def main():
-    # Cargar lista actual (si existe)
+    # Cargar lista actual
     canales_actuales = {}
     if os.path.exists(ARCHIVO_LISTA):
         with open(ARCHIVO_LISTA, 'r', encoding='utf-8') as f:
@@ -79,20 +85,24 @@ def main():
                         i += 1
                 else:
                     i += 1
-        print(f"📂 Lista actual cargada: {len(canales_actuales)} canales")
+        print(f"📂 Lista actual: {len(canales_actuales)} canales")
     
-    # Descargar y buscar nuevos canales
-    contenido = descargar_lista(FUENTE)
-    if not contenido:
-        print("Error: no se pudo descargar la lista")
+    # Buscar en todas las fuentes
+    todos_los_canales = []
+    for fuente in FUENTES:
+        contenido = descargar_lista(fuente)
+        if contenido:
+            todos_los_canales.extend(extraer_canales(contenido))
+    
+    if not todos_los_canales:
+        print("Error: no se pudo descargar ninguna fuente")
         sys.exit(1)
     
-    canales_fuente = extraer_canales(contenido)
+    # Buscar canales que coincidan con las palabras clave
     encontrados = {}
-    
     for clave in CANALES:
         print(f"Buscando: {clave}")
-        for canal in canales_fuente:
+        for canal in todos_los_canales:
             if re.search(r'\b' + re.escape(clave) + r'\b', canal['nombre'], re.IGNORECASE):
                 if 'youtube.com' in canal['url'] or 'youtu.be' in canal['url']:
                     print(f"  ⚠️ YouTube, ignorado")
@@ -107,21 +117,19 @@ def main():
         else:
             print(f"  ❌ No encontrado")
     
-    # Combinar listas (mantener los que andaban + agregar nuevos)
+    # Combinar: mantener los actuales + agregar los nuevos
     canales_final = {}
     
-    # Primero, agregar los canales actuales que ya andaban
+    # Mantener los que ya andaban
     for nombre, datos in canales_actuales.items():
-        # Verificar que el enlace siga andando
         if verificar_url(datos['url']):
             canales_final[nombre] = datos
             print(f"  ✓ Manteniendo: {nombre}")
         else:
             print(f"  ✗ Descartando (caído): {nombre}")
     
-    # Luego, agregar los nuevos encontrados que no estén ya en la lista
+    # Agregar los nuevos que no estén ya en la lista
     for clave, canal in encontrados.items():
-        # Buscar si ya existe un canal con ese nombre en la lista actual
         existe = False
         for nombre in canales_final.keys():
             if clave.lower() in nombre.lower() or nombre.lower() in clave.lower():
@@ -132,7 +140,7 @@ def main():
                 'extinf': canal['extinf'],
                 'url': canal['url']
             }
-            print(f"  ➕ Agregando nuevo: {canal['nombre']}")
+            print(f"  ➕ Agregando: {canal['nombre']}")
     
     # Guardar lista final
     with open(ARCHIVO_LISTA, 'w', encoding='utf-8') as f:
