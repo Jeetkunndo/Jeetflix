@@ -2,20 +2,18 @@ import requests
 import re
 import unicodedata
 import sys
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
-# Tus canales (con los paréntesis y todo, el script los limpia)
+# Tus canales (sin A24 porque da error y sin resoluciones para que coincidan mejor)
 CANALES = [
     "24/7 Canal de Noticias",
-    "A24 (720p)",
-    "Canal 26 (1080p)",
-    "TN (1080p)",
-    "America TV (1080p)",
-    "El Nueve (1080p)",
-    "El Siete (1080p)",
-    "El Trece (1080p)",
-    "La Nacion + (576p)",
-    "Telefe Interior (720p)"
+    "Canal 26",
+    "TN",
+    "America TV",
+    "El Nueve",
+    "El Siete",
+    "El Trece",
+    "La Nacion +",
+    "Telefe Interior"
 ]
 
 # Fuentes
@@ -26,14 +24,13 @@ FUENTES = [
 ]
 
 def limpiar(texto):
-    """Limpia el texto: quita paréntesis, símbolos, tildes, espacios extra"""
-    # Quita todo lo que esté entre paréntesis
+    # Quita paréntesis y su contenido
     texto = re.sub(r'\s*\([^)]*\)\s*', ' ', texto)
     # Quita símbolos como +, -, etc.
     texto = re.sub(r'[^\w\s]', ' ', texto)
-    # Normaliza tildes (é -> e, etc.)
+    # Quita tildes
     texto = unicodedata.normalize('NFKD', texto).encode('ASCII', 'ignore').decode('utf-8')
-    # Convierte a minúsculas y quita espacios extra
+    # Minúsculas y espacios extra
     texto = ' '.join(texto.lower().split())
     return texto
 
@@ -76,12 +73,8 @@ def verificar_url(url, timeout=3):
         return False
 
 def main():
-    # Limpiar los nombres de tus canales
-    canales_a_buscar = {}
-    for canal in CANALES:
-        clave = limpiar(canal)
-        canales_a_buscar[clave] = canal
-    
+    # Limpiar nombres de tus canales
+    canales_a_buscar = {limpiar(c): c for c in CANALES}
     canales_encontrados = {}
     
     for fuente in FUENTES:
@@ -94,10 +87,15 @@ def main():
             if nombre_original in canales_encontrados:
                 continue
             for canal in canales_fuente:
+                # Coincidencia exacta después de limpiar
                 if canal['nombre_limpio'] == clave:
+                    # Excluir YouTube (no funciona en Jellyfin)
+                    if 'youtube.com' in canal['url'] or 'youtu.be' in canal['url']:
+                        print(f"⚠️ {nombre_original} es YouTube, ignorado")
+                        break
                     if verificar_url(canal['url']):
                         canales_encontrados[nombre_original] = canal
-                        print(f"✓ {nombre_original} -> {canal['nombre_original']}")
+                        print(f"✓ {nombre_original}")
                         break
     
     with open('lista_filtrada.m3u', 'w', encoding='utf-8') as f:
@@ -106,7 +104,7 @@ def main():
             f.write(canal['extinf'] + '\n')
             f.write(canal['url'] + '\n')
     
-    print(f"\n✅ Lista generada con {len(canales_encontrados)} canales de {len(CANALES)}")
+    print(f"\n✅ Lista generada con {len(canales_encontrados)} canales")
 
 if __name__ == "__main__":
     main()
