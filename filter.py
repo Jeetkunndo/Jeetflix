@@ -4,7 +4,7 @@ import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import time
 
-# Tus canales (coincidencia EXACTA)
+# Tus canales
 CANALES = [
     "24/7 Canal de Noticias",
     "A24 (720p)",
@@ -18,9 +18,12 @@ CANALES = [
     "Telefe Interior (720p)"
 ]
 
-# Fuentes (solo iptv-org, la más confiable para nombres exactos)
+# Múltiples fuentes (orden de prioridad)
 FUENTES = [
-    "https://iptv-org.github.io/iptv/countries/ar.m3u"
+    "https://iptv-org.github.io/iptv/countries/ar.m3u",
+    "https://raw.githubusercontent.com/Free-TV/IPTV/master/playlist.m3u8",
+    "https://raw.githubusercontent.com/josejesusguzman/iptv/main/playlist.m3u",
+    "https://m3u.cl/lista/AR"
 ]
 
 def descargar_lista(url):
@@ -38,12 +41,8 @@ def extraer_canales(contenido):
     i = 0
     while i < len(lineas):
         if lineas[i].startswith('#EXTINF'):
-            # Buscar el nombre del canal después de la última coma
             partes = lineas[i].split(',')
-            if len(partes) > 1:
-                nombre = partes[-1].strip()
-            else:
-                nombre = ""
+            nombre = partes[-1].strip() if len(partes) > 1 else ""
             if i + 1 < len(lineas) and not lineas[i+1].startswith('#'):
                 url = lineas[i+1].strip()
                 canales.append({
@@ -59,36 +58,35 @@ def extraer_canales(contenido):
     return canales
 
 def verificar_url(url, timeout=3):
-    """Verifica si una URL responde (timeout más corto)"""
     try:
         response = requests.head(url, timeout=timeout, allow_redirects=True)
         return response.status_code < 400
     except:
         return False
 
+def buscar_canal_en_todas_fuentes(nombre_buscar):
+    for fuente in FUENTES:
+        contenido = descargar_lista(fuente)
+        if not contenido:
+            continue
+        canales = extraer_canales(contenido)
+        for canal in canales:
+            if canal['nombre'] == nombre_buscar:
+                if verificar_url(canal['url']):
+                    return canal
+    return None
+
 def main():
-    contenido_principal = descargar_lista(FUENTES[0])
-    if not contenido_principal:
-        print("Error: no se pudo descargar la lista")
-        sys.exit(1)
-    
-    canales_principales = extraer_canales(contenido_principal)
-    
-    # Buscar coincidencia EXACTA
     canales_encontrados = {}
     for nombre_buscar in CANALES:
-        for canal in canales_principales:
-            if canal['nombre'] == nombre_buscar:  # COINCIDENCIA EXACTA
-                if verificar_url(canal['url']):
-                    canales_encontrados[nombre_buscar] = canal
-                    print(f"✓ {nombre_buscar}: OK")
-                else:
-                    print(f"✗ {nombre_buscar}: enlace muerto")
-                break
+        print(f"Buscando: {nombre_buscar}")
+        canal = buscar_canal_en_todas_fuentes(nombre_buscar)
+        if canal:
+            canales_encontrados[nombre_buscar] = canal
+            print(f"  ✓ Encontrado")
         else:
-            print(f"✗ {nombre_buscar}: no encontrado en la fuente")
+            print(f"  ✗ No encontrado")
     
-    # Generar archivo M3U final
     with open('lista_filtrada.m3u', 'w', encoding='utf-8') as f:
         f.write('#EXTM3U\n')
         for nombre, canal in canales_encontrados.items():
