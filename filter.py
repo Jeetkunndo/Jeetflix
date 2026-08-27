@@ -3,7 +3,7 @@ import re
 import sys
 import os
 
-# Palabras clave para buscar
+# Palabras clave para buscar (las que ya tenés)
 CANALES = [
     "24/7 Canal de Noticias",
     "Canal 26",
@@ -16,7 +16,6 @@ CANALES = [
     "Telefe Interior"
 ]
 
-# Múltiples fuentes (más chances de encontrar)
 FUENTES = [
     "https://iptv-org.github.io/iptv/countries/ar.m3u",
     "https://raw.githubusercontent.com/Free-TV/IPTV/master/playlist.m3u8",
@@ -63,7 +62,7 @@ def verificar_url(url):
         return False
 
 def main():
-    # Cargar lista actual
+    # Leer lista actual (si existe)
     canales_actuales = {}
     if os.path.exists(ARCHIVO_LISTA):
         with open(ARCHIVO_LISTA, 'r', encoding='utf-8') as f:
@@ -87,7 +86,7 @@ def main():
                     i += 1
         print(f"📂 Lista actual: {len(canales_actuales)} canales")
     
-    # Buscar en todas las fuentes
+    # Buscar nuevos canales en las fuentes
     todos_los_canales = []
     for fuente in FUENTES:
         contenido = descargar_lista(fuente)
@@ -98,10 +97,10 @@ def main():
         print("Error: no se pudo descargar ninguna fuente")
         sys.exit(1)
     
-    # Buscar canales que coincidan con las palabras clave
+    # Buscar coincidencias con las palabras clave
     encontrados = {}
     for clave in CANALES:
-        print(f"Buscando: {clave}")
+        print(f"🔍 Buscando: {clave}")
         for canal in todos_los_canales:
             if re.search(r'\b' + re.escape(clave) + r'\b', canal['nombre'], re.IGNORECASE):
                 if 'youtube.com' in canal['url'] or 'youtu.be' in canal['url']:
@@ -109,7 +108,7 @@ def main():
                     break
                 if verificar_url(canal['url']):
                     encontrados[clave] = canal
-                    print(f"  ✅ Encontrado")
+                    print(f"  ✅ Encontrado: {canal['nombre']}")
                     break
                 else:
                     print(f"  ❌ No responde")
@@ -117,19 +116,11 @@ def main():
         else:
             print(f"  ❌ No encontrado")
     
-    # Combinar: mantener los actuales + agregar los nuevos
-    canales_final = {}
+    # Construir lista final: TODOS los actuales + los nuevos que no estén duplicados
+    canales_final = dict(canales_actuales)  # Empezamos con los que ya teníamos
     
-    # Mantener los que ya andaban
-    for nombre, datos in canales_actuales.items():
-        if verificar_url(datos['url']):
-            canales_final[nombre] = datos
-            print(f"  ✓ Manteniendo: {nombre}")
-        else:
-            print(f"  ✗ Descartando (caído): {nombre}")
-    
-    # Agregar los nuevos que no estén ya en la lista
     for clave, canal in encontrados.items():
+        # Verificar si ya existe un canal similar en la lista actual
         existe = False
         for nombre in canales_final.keys():
             if clave.lower() in nombre.lower() or nombre.lower() in clave.lower():
@@ -140,9 +131,9 @@ def main():
                 'extinf': canal['extinf'],
                 'url': canal['url']
             }
-            print(f"  ➕ Agregando: {canal['nombre']}")
+            print(f"  ➕ Agregando nuevo: {canal['nombre']}")
     
-    # Guardar lista final
+    # Guardar la lista (NUNCA BORRA, SOLO AGREGA)
     with open(ARCHIVO_LISTA, 'w', encoding='utf-8') as f:
         f.write('#EXTM3U\n')
         for nombre, datos in canales_final.items():
