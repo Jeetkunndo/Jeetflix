@@ -4,7 +4,7 @@ import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import time
 
-# Tus canales
+# Tus canales (nombres exactos)
 CANALES = [
     "24/7 Canal de Noticias",
     "A24 (720p)",
@@ -18,12 +18,20 @@ CANALES = [
     "Telefe Interior (720p)"
 ]
 
-# Múltiples fuentes (orden de prioridad)
+# 13 fuentes (orden de prioridad)
 FUENTES = [
     "https://iptv-org.github.io/iptv/countries/ar.m3u",
     "https://raw.githubusercontent.com/Free-TV/IPTV/master/playlist.m3u8",
     "https://raw.githubusercontent.com/josejesusguzman/iptv/main/playlist.m3u",
-    "https://m3u.cl/lista/AR"
+    "https://m3u.cl/lista/AR",
+    "https://raw.githubusercontent.com/iptv-org/iptv/master/streams/countries/ar.m3u",
+    "https://raw.githubusercontent.com/twz915/IPTV/main/IPTV-Argentina.m3u",
+    "https://raw.githubusercontent.com/matiaspe/IPTV/main/listado.m3u",
+    "https://raw.githubusercontent.com/andrew2022/iptv/master/playlist.m3u",
+    "https://raw.githubusercontent.com/MiguelAngel2201/IPTV/main/Argentina.m3u",
+    "https://raw.githubusercontent.com/gnfisher/IPTV/main/playlist.m3u",
+    "https://raw.githubusercontent.com/IPTVCAT/IPTV/main/playlist.m3u",
+    "https://raw.githubusercontent.com/PedroGonzalez/IPTV/main/list.m3u"
 ]
 
 def descargar_lista(url):
@@ -65,13 +73,18 @@ def verificar_url(url, timeout=3):
         return False
 
 def buscar_canal_en_todas_fuentes(nombre_buscar):
+    # Limpia el nombre para buscar (quita resolución entre paréntesis)
+    nombre_limpio = re.sub(r'\s*\([^)]*\)\s*', '', nombre_buscar).strip().lower()
+    
     for fuente in FUENTES:
         contenido = descargar_lista(fuente)
         if not contenido:
             continue
         canales = extraer_canales(contenido)
         for canal in canales:
-            if canal['nombre'] == nombre_buscar:
+            # Coincidencia parcial (ignora mayúsculas y resolución)
+            canal_limpio = re.sub(r'\s*\([^)]*\)\s*', '', canal['nombre']).strip().lower()
+            if nombre_limpio in canal_limpio or canal_limpio in nombre_limpio:
                 if verificar_url(canal['url']):
                     return canal
     return None
@@ -83,9 +96,9 @@ def main():
         canal = buscar_canal_en_todas_fuentes(nombre_buscar)
         if canal:
             canales_encontrados[nombre_buscar] = canal
-            print(f"  ✓ Encontrado")
+            print(f"  ✓ Encontrado: {canal['url'][:50]}...")
         else:
-            print(f"  ✗ No encontrado")
+            print(f"  ✗ No encontrado en ninguna fuente")
     
     with open('lista_filtrada.m3u', 'w', encoding='utf-8') as f:
         f.write('#EXTM3U\n')
