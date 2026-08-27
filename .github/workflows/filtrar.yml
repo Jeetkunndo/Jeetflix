@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write   # <--- LÍNEA NUEVA: da permiso para hacer git push
+  contents: write
 
 jobs:
   filter:
@@ -19,11 +19,16 @@ jobs:
         run: |
           curl -o lista_completa.m3u https://iptv-org.github.io/iptv/countries/ar.m3u
 
-      - name: Filtrar canales
+      - name: Filtrar canales exactos
         run: |
           echo "#EXTM3U" > lista_filtrada.m3u
           while IFS= read -r canal; do
-            grep -i -A1 "$canal" lista_completa.m3u >> lista_filtrada.m3u || echo "# $canal no encontrado" >> lista_filtrada.m3u
+            # Busca la línea #EXTINF que termina exactamente con ",Nombre del canal"
+            grep -F ",$canal" lista_completa.m3u | while read -r linea; do
+              echo "$linea"
+              # La URL está en la línea siguiente
+              grep -A1 -F ",$canal" lista_completa.m3u | tail -n1
+            done >> lista_filtrada.m3u
           done < canales.txt
 
       - name: Subir archivo filtrado
