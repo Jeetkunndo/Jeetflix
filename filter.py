@@ -3,7 +3,7 @@ import re
 import sys
 import os
 
-# Palabras clave para buscar (las que ya tenés)
+# Palabras clave para buscar nuevos canales
 CANALES = [
     "24/7 Canal de Noticias",
     "Canal 26",
@@ -75,16 +75,18 @@ def main():
                     nombre = partes[-1].strip() if len(partes) > 1 else ""
                     if i + 1 < len(lineas) and not lineas[i+1].startswith('#'):
                         url = lineas[i+1].strip()
-                        canales_actuales[nombre] = {
-                            'extinf': lineas[i],
-                            'url': url
-                        }
+                        # Solo mantener los que ANDAN (verificar ahora)
+                        if verificar_url(url):
+                            canales_actuales[nombre] = {
+                                'extinf': lineas[i],
+                                'url': url
+                            }
                         i += 2
                     else:
                         i += 1
                 else:
                     i += 1
-        print(f"📂 Lista actual: {len(canales_actuales)} canales")
+        print(f"📂 Canales actuales que andan: {len(canales_actuales)}")
     
     # Buscar nuevos canales en las fuentes
     todos_los_canales = []
@@ -116,11 +118,12 @@ def main():
         else:
             print(f"  ❌ No encontrado")
     
-    # Construir lista final: TODOS los actuales + los nuevos que no estén duplicados
-    canales_final = dict(canales_actuales)  # Empezamos con los que ya teníamos
+    # Construir lista final:
+    # 1. Empezamos con los canales actuales que andan
+    canales_final = dict(canales_actuales)
     
+    # 2. Agregamos los nuevos que no estén ya en la lista
     for clave, canal in encontrados.items():
-        # Verificar si ya existe un canal similar en la lista actual
         existe = False
         for nombre in canales_final.keys():
             if clave.lower() in nombre.lower() or nombre.lower() in clave.lower():
@@ -133,7 +136,7 @@ def main():
             }
             print(f"  ➕ Agregando nuevo: {canal['nombre']}")
     
-    # Guardar la lista (NUNCA BORRA, SOLO AGREGA)
+    # Guardar la lista (NUNCA BORRA, SOLO AGREGA O MANTIENE)
     with open(ARCHIVO_LISTA, 'w', encoding='utf-8') as f:
         f.write('#EXTM3U\n')
         for nombre, datos in canales_final.items():
