@@ -1,4 +1,4 @@
-name: Filtrar lista M3U
+name: Filtrar y verificar lista M3U
 
 on:
   schedule:
@@ -15,26 +15,23 @@ jobs:
       - name: Clonar repo
         uses: actions/checkout@v4
 
-      - name: Descargar lista completa
-        run: |
-          curl -o lista_completa.m3u https://iptv-org.github.io/iptv/countries/ar.m3u
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
 
-      - name: Filtrar canales exactos
+      - name: Instalar dependencias
         run: |
-          echo "#EXTM3U" > lista_filtrada.m3u
-          while IFS= read -r canal; do
-            # Busca la línea #EXTINF que termina exactamente con ",Nombre del canal"
-            grep -F ",$canal" lista_completa.m3u | while read -r linea; do
-              echo "$linea"
-              # La URL está en la línea siguiente
-              grep -A1 -F ",$canal" lista_completa.m3u | tail -n1
-            done >> lista_filtrada.m3u
-          done < canales.txt
+          pip install requests
+
+      - name: Ejecutar script de filtrado y verificación
+        run: |
+          python filter.py
 
       - name: Subir archivo filtrado
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
           git add lista_filtrada.m3u
-          git commit -m "Actualizar lista filtrada" || echo "Sin cambios"
+          git commit -m "Actualizar lista filtrada y verificada" || echo "Sin cambios"
           git push
