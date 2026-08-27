@@ -2,8 +2,9 @@ import requests
 import re
 import sys
 import os
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
-# Palabras clave para buscar nuevos canales
+# Palabras clave para buscar tus canales
 CANALES = [
     "24/7 Canal de Noticias",
     "Canal 26",
@@ -16,10 +17,23 @@ CANALES = [
     "Telefe Interior"
 ]
 
+# Múltiples fuentes (ampliado a 15)
 FUENTES = [
     "https://iptv-org.github.io/iptv/countries/ar.m3u",
     "https://raw.githubusercontent.com/Free-TV/IPTV/master/playlist.m3u8",
-    "https://m3u.cl/lista/AR"
+    "https://m3u.cl/lista/AR",
+    "https://raw.githubusercontent.com/josejesusguzman/iptv/main/playlist.m3u",
+    "https://raw.githubusercontent.com/iptv-org/iptv/master/streams/countries/ar.m3u",
+    "https://raw.githubusercontent.com/twz915/IPTV/main/IPTV-Argentina.m3u",
+    "https://raw.githubusercontent.com/matiaspe/IPTV/main/listado.m3u",
+    "https://raw.githubusercontent.com/andrew2022/iptv/master/playlist.m3u",
+    "https://raw.githubusercontent.com/MiguelAngel2201/IPTV/main/Argentina.m3u",
+    "https://raw.githubusercontent.com/gnfisher/IPTV/main/playlist.m3u",
+    "https://raw.githubusercontent.com/IPTVCAT/IPTV/main/playlist.m3u",
+    "https://raw.githubusercontent.com/PedroGonzalez/IPTV/main/list.m3u",
+    "https://raw.githubusercontent.com/iptv-org/iptv/master/streams/sat/ar.m3u",
+    "https://raw.githubusercontent.com/iptv-org/iptv/master/streams/radio/countries/ar.m3u",
+    "https://raw.githubusercontent.com/EddieLuis/IPTV/main/playlist.m3u"
 ]
 
 ARCHIVO_LISTA = "lista_filtrada.m3u"
@@ -62,7 +76,7 @@ def verificar_url(url):
         return False
 
 def main():
-    # Leer lista actual (si existe)
+    # Leer lista actual
     canales_actuales = {}
     if os.path.exists(ARCHIVO_LISTA):
         with open(ARCHIVO_LISTA, 'r', encoding='utf-8') as f:
@@ -75,7 +89,6 @@ def main():
                     nombre = partes[-1].strip() if len(partes) > 1 else ""
                     if i + 1 < len(lineas) and not lineas[i+1].startswith('#'):
                         url = lineas[i+1].strip()
-                        # Solo mantener los que ANDAN (verificar ahora)
                         if verificar_url(url):
                             canales_actuales[nombre] = {
                                 'extinf': lineas[i],
@@ -88,18 +101,28 @@ def main():
                     i += 1
         print(f"📂 Canales actuales que andan: {len(canales_actuales)}")
     
-    # Buscar nuevos canales en las fuentes
-    todos_los_canales = []
-    for fuente in FUENTES:
-        contenido = descargar_lista(fuente)
-        if contenido:
-            todos_los_canales.extend(extraer_canales(contenido))
+    # Descargar todas las fuentes en paralelo
+    print("📡 Descargando fuentes...")
+    contenidos = []
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        futuros = {executor.submit(descargar_lista, url): url for url in FUENTES}
+        for futuro in as_completed(futuros):
+            resultado = futuro.result()
+            if resultado:
+                contenidos.append(resultado)
     
-    if not todos_los_canales:
+    if not contenidos:
         print("Error: no se pudo descargar ninguna fuente")
         sys.exit(1)
     
-    # Buscar coincidencias con las palabras clave
+    # Extraer canales de todas las fuentes
+    todos_los_canales = []
+    for contenido in contenidos:
+        todos_los_canales.extend(extraer_canales(contenido))
+    
+    print(f"📡 Total de canales encontrados: {len(todos_los_canales)}")
+    
+    # Buscar coincidencias
     encontrados = {}
     for clave in CANALES:
         print(f"🔍 Buscando: {clave}")
@@ -118,11 +141,8 @@ def main():
         else:
             print(f"  ❌ No encontrado")
     
-    # Construir lista final:
-    # 1. Empezamos con los canales actuales que andan
+    # Combinar listas
     canales_final = dict(canales_actuales)
-    
-    # 2. Agregamos los nuevos que no estén ya en la lista
     for clave, canal in encontrados.items():
         existe = False
         for nombre in canales_final.keys():
@@ -136,7 +156,7 @@ def main():
             }
             print(f"  ➕ Agregando nuevo: {canal['nombre']}")
     
-    # Guardar la lista (NUNCA BORRA, SOLO AGREGA O MANTIENE)
+    # Guardar lista
     with open(ARCHIVO_LISTA, 'w', encoding='utf-8') as f:
         f.write('#EXTM3U\n')
         for nombre, datos in canales_final.items():
