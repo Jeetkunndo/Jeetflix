@@ -7,3 +7,5 @@ http://200.91.32.158:8080/telefehdvalle/index.m3u8
 https://stream-gtlc.telecentro.net.ar/hls/canal26hls/main.m3u8
 #EXTINF:-1 group-title="Argentina",24/7 Canal de Noticias
 https://panel.host-live.com:19360/cn247tv/cn247tv.m3u8
+#EXTINF:-1 tvg-name="El Nueve" tvg-logo="https://i.imgur.com/EtcVSm4.png" tvg-id="ElNueve.ar" tvg-chno="35.1" tvg-country="AR" group-title="Argentina",El Nueve
+http://45.226.28.9:8085/Live/18e292ea93b66c65c76707f07c489d61/local-canal9.playlist.m3u8
