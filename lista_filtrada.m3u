@@ -1,6 +1,4 @@
 #EXTM3U
-#EXTINF:-1 group-title="Argentina",El Trece
-https://livetrx01.vodgc.net/eltrecetv/index.m3u8
 #EXTINF:-1 group-title="Argentina",Telefe Interior
 http://200.91.32.158:8080/telefehdvalle/index.m3u8
 #EXTINF:-1 group-title="Argentina",Canal 26
